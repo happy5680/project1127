@@ -1,10 +1,10 @@
 // server.js
 import express from "express";
-import fetch from "node-fetch"; // Node.js fetch
+import fetch from "node-fetch"; 
 import cors from "cors";
 import dotenv from "dotenv";
-import path from "path"; // 引入 path 模組來處理檔案路徑
-import { fileURLToPath } from 'url'; // 引入處理 ES Module 路徑的工具
+import path from "path"; 
+import { fileURLToPath } from 'url'; 
 
 // 處理 ES Module 中 __dirname 不存在的問題
 const __filename = fileURLToPath(import.meta.url);
@@ -19,17 +19,21 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 
 // ==========================================================
-// ⭐ 關鍵修改：設置靜態文件目錄，讓 Express 服務 index.html
+// ⭐ 強制靜態文件服務優先：確保根路徑 '/' 返回 index.html
+// 即使其他地方有衝突的根路由，此處也會優先處理
 // ==========================================================
-// 假設 index.html 和 app.js 都在 project/ 根目錄下
-app.use(express.static(path.join(__dirname))); 
-
-// 確保根路徑 '/' 返回 index.html
-// 即使沒有這段，app.use(express.static) 也會自動查找並服務 index.html
-// 但加上這段可以確保即使其他路徑也找不到，也會導向 index.html
+// 1. 優先處理 / 路徑，回覆 index.html
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "index.html"));
+    // 檢查是否是瀏覽器請求 (防止被其他服務誤判)
+    if (req.accepts('html')) {
+        return res.sendFile(path.join(__dirname, "index.html"));
+    }
+    // 如果不是 HTML 請求，繼續到下一個路由 (讓 API 路由處理)
+    return next();
 });
+
+// 2. 處理所有靜態文件 (如 app.js, CSS, 圖片等)
+app.use(express.static(path.join(__dirname))); 
 // ==========================================================
 
 // 🚀 YouTube 搜尋 API 路由
@@ -37,10 +41,8 @@ app.get("/api/search", async (req, res) => {
     const q = req.query.q;
     if (!q) return res.status(400).json({ error: "請提供搜尋關鍵字" });
 
-    // 請注意，您之前設定的變數可能是 YT_KEY 或其他名稱，請確保一致
     const API_KEY = process.env.YT_KEY; 
     
-    // 檢查 API KEY 是否存在，提升錯誤訊息可讀性
     if (!API_KEY) {
         return res.status(500).json({ error: "API 金鑰未設定 (YT_KEY is missing)" });
     }
